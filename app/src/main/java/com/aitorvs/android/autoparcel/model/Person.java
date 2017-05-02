@@ -17,33 +17,8 @@ package com.aitorvs.android.autoparcel.model;
  */
 
 import android.os.Parcelable;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 
-import com.aitorvs.autoparcel.AutoParcel;
-import com.aitorvs.autoparcel.ParcelAdapter;
-import com.aitorvs.autoparcel.ParcelVersion;
+import com.aitorvs.autoparcel.AutoParcelMap;
 
-import java.util.Date;
-
-@AutoParcel(version = 1)
-public abstract class Person implements Parcelable {
-    @Nullable
-    public String name;
-
-    @ParcelVersion(from = 1)
-    @Nullable
-    public String lastName;
-
-    @ParcelAdapter(DateTypeAdapter.class)
-    public Date birthday;
-
-    public int age;
-
-    // this is another parcelable object
-    public Address address;
-
-    public static Person create(@NonNull String name, @NonNull Date birthday, int age, Address address) {
-        return new AutoParcel_Person(name, "Doe", birthday, age, address);
-    }
-}
+@AutoParcelMap(map = ApiPerson.class, prefix = "UI")
+public abstract class Person implements Parcelable { }

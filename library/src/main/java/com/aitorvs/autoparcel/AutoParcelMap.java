@@ -16,6 +16,8 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.TYPE) // on class level
 @Retention(RetentionPolicy.SOURCE)
-public @interface AutoParcel {
+public @interface AutoParcelMap {
     int version() default 0;
+    Class<?> map() default void.class;
+    String prefix() default "FD";
 }

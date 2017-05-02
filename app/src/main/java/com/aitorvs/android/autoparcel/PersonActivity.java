@@ -2,15 +2,16 @@ package com.aitorvs.android.autoparcel;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.TextView;
 
 import com.aitorvs.android.autoparcel.model.Person;
+import com.aitorvs.android.autoparcel.model.UIPerson;
 
 public class PersonActivity extends AppCompatActivity {
 
@@ -41,7 +42,7 @@ public class PersonActivity extends AppCompatActivity {
         // get the passed intent
         Intent intent = getIntent();
         if (intent != null) {
-            Person person = intent.getParcelableExtra(EXTRA_PERSON);
+            UIPerson person = intent.getParcelableExtra(EXTRA_PERSON);
             fullName.setText(getString(R.string.formatName, person.name));
             date.setText(getString(R.string.format_date, person.birthday.toString()));
             age.setText(getString(R.string.format_age, person.age));

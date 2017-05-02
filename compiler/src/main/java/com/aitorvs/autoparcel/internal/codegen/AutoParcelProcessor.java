@@ -16,7 +16,7 @@ package com.aitorvs.autoparcel.internal.codegen;
  * limitations under the License.
  */
 
-import com.aitorvs.autoparcel.AutoParcel;
+import com.aitorvs.autoparcel.AutoParcelMap;
 import com.aitorvs.autoparcel.ParcelAdapter;
 import com.aitorvs.autoparcel.ParcelVersion;
 import com.aitorvs.autoparcel.internal.common.MoreElements;
@@ -56,6 +56,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.MirroredTypeException;
@@ -71,11 +72,10 @@ import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
-@SupportedAnnotationTypes("com.aitorvs.autoparcel.AutoParcel")
+@SupportedAnnotationTypes("com.aitorvs.autoparcel.AutoParcelMap")
 public final class AutoParcelProcessor extends AbstractProcessor {
     private ErrorReporter mErrorReporter;
     private Types mTypeUtils;
-
 
     static final class Property {
         final String fieldName;
@@ -139,7 +139,7 @@ public final class AutoParcelProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
         Collection<? extends Element> annotatedElements =
-                env.getElementsAnnotatedWith(AutoParcel.class);
+                env.getElementsAnnotatedWith(AutoParcelMap.class);
         List<TypeElement> types = new ImmutableList.Builder<TypeElement>()
                 .addAll(ElementFilter.typesIn(annotatedElements))
                 .build();
@@ -153,13 +153,13 @@ public final class AutoParcelProcessor extends AbstractProcessor {
     }
 
     private void processType(TypeElement type) {
-        AutoParcel autoParcel = type.getAnnotation(AutoParcel.class);
-        if (autoParcel == null) {
+        AutoParcelMap autoParcelMap = type.getAnnotation(AutoParcelMap.class);
+        if (autoParcelMap == null) {
             mErrorReporter.abortWithError("annotation processor for @AutoParcel was invoked with a" +
                     "type annotated differently; compiler bug? O_o", type);
         }
         if (type.getKind() != ElementKind.CLASS) {
-            mErrorReporter.abortWithError("@" + AutoParcel.class.getName() + " only applies to classes", type);
+            mErrorReporter.abortWithError("@" + AutoParcelMap.class.getName() + " only applies to classes", type);
         }
         if (ancestorIsAutoParcel(type)) {
             mErrorReporter.abortWithError("One @AutoParcel class shall not extend another", type);
@@ -209,7 +209,20 @@ public final class AutoParcelProcessor extends AbstractProcessor {
         if (classToExtend == null) {
             mErrorReporter.abortWithError("generateClass was invoked with null parent class", type);
         }
-        List<VariableElement> nonPrivateFields = getParcelableFieldsOrError(type);
+        List<VariableElement> nonPrivateFields = new ArrayList<>();
+        addNonPrivateFields(type, nonPrivateFields);
+
+        TypeElement sourceElement = null;
+        TypeMirror map = getMap(type.getAnnotation(AutoParcelMap.class));
+        if (map != null && map.getClass() != null && !map.getClass().getCanonicalName().equals(void.class.getCanonicalName())) {
+            Types typeUtils = processingEnv.getTypeUtils();
+            Element elm = typeUtils.asElement(map);
+            if (elm != null) {
+                addNonPrivateFields((TypeElement) elm, nonPrivateFields);
+                sourceElement = (TypeElement) elm;
+            }
+        }
+
         if (nonPrivateFields.isEmpty()) {
             mErrorReporter.abortWithError("generateClass error, all fields are declared PRIVATE", type);
         }
@@ -222,7 +235,7 @@ public final class AutoParcelProcessor extends AbstractProcessor {
 
         // get the parcel version
         //noinspection ConstantConditions
-        int version = type.getAnnotation(AutoParcel.class).version();
+        int version = type.getAnnotation(AutoParcelMap.class).version();
 
         // Generate the AutoParcel_??? class
         String pkg = TypeUtil.packageNameOf(type);
@@ -231,7 +244,7 @@ public final class AutoParcelProcessor extends AbstractProcessor {
                 // Add the version
                 .addField(TypeName.INT, "version", PRIVATE)
                 // Class must be always final
-                .addModifiers(FINAL)
+                .addModifiers(new Modifier[]{FINAL, PUBLIC})
                 // extends from original abstract class
                 .superclass(ClassName.get(pkg, classToExtend))
                 // Add the DEFAULT constructor
@@ -243,7 +256,13 @@ public final class AutoParcelProcessor extends AbstractProcessor {
                 // static final CREATOR
                 .addField(generateCreator(processingEnv, properties, classTypeName, typeAdapters))
                 // overrides writeToParcel()
-                .addMethod(generateWriteToParcel(version, processingEnv, properties, typeAdapters)); // generate writeToParcel()
+                .addMethod(generateWriteToParcel(version, processingEnv, properties, typeAdapters)) // generate writeToParcel()
+                // create empty constructor
+                .addMethod(MethodSpec.constructorBuilder().addModifiers(PUBLIC).build())
+                // Add fields from mapping only
+                .addFields(generateFieldSpecs(properties))
+                // Add map from constructor
+                .addMethod(generateMapFromCreator(processingEnv, classTypeName, sourceElement, properties));
 
         if (!ancestoIsParcelable(processingEnv, type)) {
             // Implement android.os.Parcelable if the ancestor does not do it.
@@ -317,6 +336,7 @@ public final class AutoParcelProcessor extends AbstractProcessor {
         }
 
         MethodSpec.Builder builder = MethodSpec.constructorBuilder()
+                .addModifiers(PUBLIC)
                 .addParameters(params);
 
         for (ParameterSpec param : params) {
@@ -377,14 +397,19 @@ public final class AutoParcelProcessor extends AbstractProcessor {
     }
 
     private String generatedSubclassName(TypeElement type, int depth) {
-        return generatedClassName(type, Strings.repeat("$", depth) + "AutoParcel_");
+        String prefix = type.getAnnotation(AutoParcelMap.class).prefix();
+        if (prefix == null || prefix.trim().length() == 0) {
+            throw new RuntimeException("Generated class prefix cannot be the same the source");
+        }
+
+        return generatedClassName(type, Strings.repeat("$", depth) + prefix);
     }
 
     private String generatedClassName(TypeElement type, String prefix) {
         String name = type.getSimpleName().toString();
         while (type.getEnclosingElement() instanceof TypeElement) {
             type = (TypeElement) type.getEnclosingElement();
-            name = type.getSimpleName() + "_" + name;
+            name = type.getSimpleName() + name;
         }
         String pkg = TypeUtil.packageNameOf(type);
         String dot = pkg.isEmpty() ? "" : ".";
@@ -497,7 +522,7 @@ public final class AutoParcelProcessor extends AbstractProcessor {
                 return false;
             }
             TypeElement parentElement = (TypeElement) mTypeUtils.asElement(parentMirror);
-            if (MoreElements.isAnnotationPresent(parentElement, AutoParcel.class)) {
+            if (MoreElements.isAnnotationPresent(parentElement, AutoParcelMap.class)) {
                 return true;
             }
             type = parentElement;
@@ -515,5 +540,60 @@ public final class AutoParcelProcessor extends AbstractProcessor {
         return AnnotationSpec.builder(SuppressWarnings.class)
                 .addMember("value", "\"unchecked\"")
                 .build();
+    }
+
+    private Iterable<FieldSpec> generateFieldSpecs(ImmutableList<Property> properties) {
+        List<FieldSpec> fields = new ArrayList<>();
+        for (Property property : properties) {
+            fields.add(
+                FieldSpec.builder(property.typeName, property.fieldName, new Modifier[]{PUBLIC}).build()
+            );
+        }
+
+        return fields;
+    }
+
+    private MethodSpec generateMapFromCreator(ProcessingEnvironment env, TypeName type, TypeElement source, Iterable<Property> params) {
+        MethodSpec.Builder builder = MethodSpec.methodBuilder("mapFrom")
+            .addModifiers(new Modifier[]{STATIC, PUBLIC, FINAL})
+            .returns(type);
+
+        if (source != null) {
+            builder.addParameter(ClassName.bestGuess(source.toString()), "source");
+
+            builder.addStatement("$T mapped = new $T()", type, type);
+            for (Property param : params) {
+                builder.addStatement("mapped.$N = source.$N", param.fieldName, param.fieldName);
+            }
+            builder.addCode("\n\n");
+            builder.addStatement("return mapped");
+        } else {
+            builder.addStatement("return null");
+        }
+
+        return builder.build();
+    }
+
+    private static TypeMirror getMap(AutoParcelMap annotation) {
+        try {
+            annotation.map(); // this should throw
+        } catch (MirroredTypeException mte) {
+            return mte.getTypeMirror();
+        }
+
+        return null; // can this ever happen ??
+    }
+
+    private void addNonPrivateFields(TypeElement element, List<VariableElement> nonPrivateFields) {
+        if (hasSuperClass(element)) {
+            Types typeUtils = processingEnv.getTypeUtils();
+            Element elm = typeUtils.asElement(element.getSuperclass());
+            addNonPrivateFields((TypeElement) elm, nonPrivateFields);
+        }
+        nonPrivateFields.addAll(getParcelableFieldsOrError(element));
+    }
+
+    private boolean hasSuperClass(TypeElement element) {
+        return !element.getSuperclass().toString().equals(Object.class.getCanonicalName());
     }
 }

@@ -1,4 +1,9 @@
-# Auto-Parcel
+# Notice
+Based on the great work from :
+https://github.com/aitorvs/auto-parcel
+
+
+# Auto-Parcel-Map
 
 A fast annotation processor to make your objects `Parcelable` without
 writing any of the boilerplate.
