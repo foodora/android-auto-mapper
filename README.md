@@ -48,8 +48,8 @@ dependencies {
     
     //... other dependencies here
     
-    provided 'com.github.aitorvs.auto-parcel:library:0.2.0'
-    apt 'com.github.aitorvs.auto-parcel:compiler:0.2.0'
+    provided 'com.github.shehabic.auto-parcel-map:library:1.0.0'
+    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.0'
 }
 ```
 
