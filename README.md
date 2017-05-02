@@ -27,7 +27,7 @@ This is yet-another-parcelable-library that uses Android Studio
 annotation processors to generate your parcelable classes at compile time.
 
 ## Installation
-[![](https://jitpack.io/v/aitorvs/auto-parcel.svg)](https://jitpack.io/#aitorvs/auto-parcel)
+[![](https://jitpack.io/v/shehabic/auto-parcel-map.svg)](https://jitpack.io/#shehabic/auto-parcel-map)
 
 ### Repository
 
@@ -62,21 +62,13 @@ Just create an abstract `Parcelable`-to-be class, annotate it with `@AutoParcel`
 it will do the rest.
 
 ```java
-import com.aitorvs.autoparcel.AutoParcel;
+import com.shehabic.autoparcel.AutoParcelMap;
 
-@AutoParcel
-public abstract class Person {
-    @Nullable
-    public String name;
-    public int age;
-
-    public static Person create(@NonNull String name, int age) {
-        return new AutoParcel_Person(name, age);
-    }
-}
+@AutoParcelMap(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix")
+public abstract class Person implements Parcelable { }
 ```
 
-AutoParcel will generate a parcelable class that extends from the abstract
+AutoParcelMap will generate a parcelable class that extends from the abstract
 class you created. The generated class name follows the convention `AutoParcel_<YouClassName>`.
 
 You will need to add a convenience builder method (e.g. `creator`) that 
@@ -109,7 +101,7 @@ Let's see an example for a `Date` parcel adapter.
 
 ```java
 import android.os.Parcel;
-import com.aitorvs.autoparcel.ParcelTypeAdapter;
+import com.shehabic.autoparcel.ParcelTypeAdapter;
 import java.util.Date;
 
 class DateTypeAdapter implements ParcelTypeAdapter<Date> {
@@ -128,7 +120,7 @@ class DateTypeAdapter implements ParcelTypeAdapter<Date> {
 Now you can use your adapter into your classes.
 
 ```java
-import com.aitorvs.autoparcel.AutoParcel;
+import com.shehabic.autoparcel.AutoParcel;
 
 @AutoParcel
 public abstract class Person {
@@ -148,7 +140,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.aitorvs.auto-parcel:adapter:0.2.0'
+compile 'com.github.shehabic.auto-parcel:adapter:1.0.0'
 ```
 
 ## Version-able Parcels
@@ -225,6 +217,20 @@ according to their appearance in the source file.
 ## License
 
 ```
+Copyright 2017 Mohamed Shehab Osman.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
 Copyright 2016 Aitor Viana Sánchez.
 
 Licensed under the Apache License, Version 2.0 (the "License");
