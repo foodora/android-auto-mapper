@@ -20,4 +20,5 @@ public @interface AutoParcelMap {
     int version() default 0;
     Class<?> map() default void.class;
     String prefix() default "FD";
+    String finalName() default "";
 }

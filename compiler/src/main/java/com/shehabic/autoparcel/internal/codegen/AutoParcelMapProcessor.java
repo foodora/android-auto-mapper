@@ -16,16 +16,16 @@ package com.shehabic.autoparcel.internal.codegen;
  * limitations under the License.
  */
 
-import com.shehabic.autoparcel.AutoParcelMap;
-import com.shehabic.autoparcel.ParcelAdapter;
-import com.shehabic.autoparcel.ParcelVersion;
-import com.shehabic.autoparcel.internal.common.MoreElements;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.shehabic.autoparcel.AutoParcelMap;
+import com.shehabic.autoparcel.ParcelAdapter;
+import com.shehabic.autoparcel.ParcelVersion;
+import com.shehabic.autoparcel.internal.common.MoreElements;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
@@ -398,22 +398,24 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
 
     private String generatedSubclassName(TypeElement type, int depth) {
         String prefix = type.getAnnotation(AutoParcelMap.class).prefix();
-        if (prefix == null || prefix.trim().length() == 0) {
-            throw new RuntimeException("Generated class prefix cannot be the same the source");
+        String finalName = type.getAnnotation(AutoParcelMap.class).finalName();
+        String typeName = type.getSimpleName().toString();
+        String name = prefix.trim() + typeName;
+        if (finalName.equals(name)) {
+            throw new RuntimeException("You need to specify a different final name or a prefix");
         }
 
-        return generatedClassName(type, Strings.repeat("$", depth) + prefix);
+        return generatedClassName(type, Strings.repeat("$", depth) + (finalName.trim().length() > 0 ? finalName : name));
     }
 
-    private String generatedClassName(TypeElement type, String prefix) {
-        String name = type.getSimpleName().toString();
+    private String generatedClassName(TypeElement type, String name) {
         while (type.getEnclosingElement() instanceof TypeElement) {
             type = (TypeElement) type.getEnclosingElement();
             name = type.getSimpleName() + name;
         }
         String pkg = TypeUtil.packageNameOf(type);
         String dot = pkg.isEmpty() ? "" : ".";
-        return pkg + dot + prefix + name;
+        return pkg + dot + name;
     }
 
     private MethodSpec generateWriteToParcel(

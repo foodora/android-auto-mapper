@@ -20,5 +20,5 @@ import android.os.Parcelable;
 
 import com.shehabic.autoparcel.AutoParcelMap;
 
-@AutoParcelMap(map = ApiPerson.class, prefix = "UI")
-public abstract class Person implements Parcelable { }
+@AutoParcelMap(map = ApiPerson.class, finalName = "Person")
+public abstract class MapPerson implements Parcelable { }

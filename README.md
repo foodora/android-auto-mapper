@@ -64,8 +64,8 @@ it will do the rest.
 ```java
 import com.shehabic.autoparcel.AutoParcelMap;
 
-@AutoParcelMap(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix")
-public abstract class Person implements Parcelable { }
+@AutoParcelMap(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix", finalName = "OrSimplyFinalClassName")
+public abstract class MappingPerson implements Parcelable { }
 ```
 
 AutoParcelMap will generate a parcelable class that extends from the abstract
