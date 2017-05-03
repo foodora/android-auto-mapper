@@ -11,7 +11,7 @@ import android.view.View;
 import android.widget.EditText;
 
 import com.shehabic.android.autoparcel.model.Address;
-import com.shehabic.android.autoparcel.model.Person;
+import com.shehabic.android.autoparcel.model.FDPerson;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -56,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
                             mPostcodeEditText.getText().toString(),
                             mCityEditText.getText().toString(),
                             /* Country */ null);
-                    Person person = new Person("", mNameEditText.getText().toString(), date, age, address);
+                    FDPerson person = new FDPerson();
 
                     Intent activityIntent = PersonActivity.createIntent(MainActivity.this, person);
 

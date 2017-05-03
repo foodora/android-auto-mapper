@@ -10,7 +10,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.widget.TextView;
 
-import com.shehabic.android.autoparcel.model.Person;
+import com.shehabic.android.autoparcel.model.FDPerson;
 import com.shehabic.android.autoparcel.model.MapPerson;
 
 public class PersonActivity extends AppCompatActivity {
@@ -42,7 +42,7 @@ public class PersonActivity extends AppCompatActivity {
         // get the passed intent
         Intent intent = getIntent();
         if (intent != null) {
-            Person person = intent.getParcelableExtra(EXTRA_PERSON);
+            FDPerson person = intent.getParcelableExtra(EXTRA_PERSON);
             fullName.setText(getString(R.string.formatName, person.name));
             date.setText(getString(R.string.format_date, person.birthday.toString()));
             age.setText(getString(R.string.format_age, person.age));

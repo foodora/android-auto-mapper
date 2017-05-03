@@ -1,6 +1,7 @@
 package com.shehabic.autoparcel.internal.codegen;
 
 /*
+ * Copyright (C) 03/05/17 shehabic
  * Copyright (C) 13/07/16 aitorvs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,6 +57,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -199,6 +201,18 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         }
     }
 
+    private boolean hasCustomMappingMethod(TypeElement type) {
+        List<ExecutableElement> methods = ElementFilter.methodsIn(type.getEnclosedElements());
+        for (ExecutableElement method : methods) {
+            System.out.println("-------> Method: " + method.getSimpleName());
+            if (method.getSimpleName().toString().equals("map")) {
+               return true;
+            }
+        }
+
+        return false;
+    }
+
     private String generateClass(TypeElement type, String className, String classToExtend, boolean isFinal) {
         if (type == null) {
             mErrorReporter.abortWithError("generateClass was invoked with null type", type);
@@ -210,6 +224,7 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
             mErrorReporter.abortWithError("generateClass was invoked with null parent class", type);
         }
         List<VariableElement> nonPrivateFields = new ArrayList<>();
+        List<VariableElement> mappedOnlyFields = new ArrayList<>();
         addNonPrivateFields(type, nonPrivateFields);
 
         TypeElement sourceElement = null;
@@ -218,7 +233,8 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
             Types typeUtils = processingEnv.getTypeUtils();
             Element elm = typeUtils.asElement(map);
             if (elm != null) {
-                addNonPrivateFields((TypeElement) elm, nonPrivateFields);
+                addNonPrivateFields((TypeElement) elm, mappedOnlyFields);
+                nonPrivateFields.addAll(mappedOnlyFields);
                 sourceElement = (TypeElement) elm;
             }
         }
@@ -229,6 +245,8 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
 
         // get the properties
         ImmutableList<Property> properties = buildProperties(nonPrivateFields);
+
+        ImmutableList<Property> mappedProperties = buildProperties(mappedOnlyFields);
 
         // get the type adapters
         ImmutableMap<TypeMirror, FieldSpec> typeAdapters = getTypeAdapters(properties);
@@ -262,7 +280,7 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
                 // Add fields from mapping only
                 .addFields(generateFieldSpecs(properties))
                 // Add map from constructor
-                .addMethod(generateMapFromCreator(processingEnv, classTypeName, sourceElement, properties));
+                .addMethod(generateMapFromCreator(type, classTypeName, sourceElement, mappedProperties));
 
         if (!ancestoIsParcelable(processingEnv, type)) {
             // Implement android.os.Parcelable if the ancestor does not do it.
@@ -555,19 +573,22 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         return fields;
     }
 
-    private MethodSpec generateMapFromCreator(ProcessingEnvironment env, TypeName type, TypeElement source, Iterable<Property> params) {
+    private MethodSpec generateMapFromCreator(TypeElement type, TypeName typeName, TypeElement source, Iterable<Property> params) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder("mapFrom")
             .addModifiers(new Modifier[]{STATIC, PUBLIC, FINAL})
-            .returns(type);
+            .returns(typeName);
 
         if (source != null) {
             builder.addParameter(ClassName.bestGuess(source.toString()), "source");
 
-            builder.addStatement("$T mapped = new $T()", type, type);
+            builder.addStatement("$T mapped = new $T()", typeName, typeName);
             for (Property param : params) {
                 builder.addStatement("mapped.$N = source.$N", param.fieldName, param.fieldName);
             }
-            builder.addCode("\n\n");
+            if (hasCustomMappingMethod(type)) {
+                builder.addStatement("mapped.map(mapped)");
+            }
+
             builder.addStatement("return mapped");
         } else {
             builder.addStatement("return null");

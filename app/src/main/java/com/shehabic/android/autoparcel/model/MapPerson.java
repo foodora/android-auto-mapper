@@ -1,6 +1,7 @@
 package com.shehabic.android.autoparcel.model;
 
 /*
+ * Copyright (C) 03/05/17 shehabic
  * Copyright (C) 13/07/16 aitorvs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,5 +21,14 @@ import android.os.Parcelable;
 
 import com.shehabic.autoparcel.AutoParcelMap;
 
-@AutoParcelMap(map = ApiPerson.class, finalName = "Person")
-public abstract class MapPerson implements Parcelable { }
+import java.util.ArrayList;
+import java.util.List;
+
+@AutoParcelMap(map = ApiPerson.class, finalName = "FDPerson")
+public abstract class MapPerson implements Parcelable {
+
+    List<String> propery = new ArrayList<>();
+
+    void map(FDPerson person) {
+    }
+}
