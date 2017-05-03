@@ -27,8 +27,12 @@ import java.util.List;
 @AutoParcelMap(map = ApiPerson.class, finalName = "FDPerson")
 public abstract class MapPerson implements Parcelable {
 
-    List<String> propery = new ArrayList<>();
+    List<String> property = new ArrayList<>();
 
     void map(FDPerson person) {
+        property.add(person.lastName);
+        property.add(person.name);
+        property.add(person.birthday.toString());
+        property.add(String.valueOf(person.age));
     }
 }

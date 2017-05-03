@@ -48,8 +48,8 @@ dependencies {
 
     //... other dependencies here
 
-    provided 'com.github.shehabic.auto-parcel-map:library:1.0.2'
-    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.2'
+    provided 'com.github.shehabic.auto-parcel-map:library:1.0.3'
+    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.3'
 }
 ```
 
@@ -140,7 +140,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.shehabic.auto-parcel:adapter:1.0.2'
+compile 'com.github.shehabic.auto-parcel:adapter:1.0.3'
 ```
 
 ## Version-able Parcels

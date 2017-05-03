@@ -44,6 +44,8 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +80,8 @@ import static javax.lang.model.element.Modifier.STATIC;
 public final class AutoParcelMapProcessor extends AbstractProcessor {
     private ErrorReporter mErrorReporter;
     private Types mTypeUtils;
+    private final Map<String, TypeElement> generated = new HashMap<>();
+    private final Set<TypeElement> processing = new HashSet<>();
 
     static final class Property {
         final String fieldName;
@@ -140,8 +144,7 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
-        Collection<? extends Element> annotatedElements =
-                env.getElementsAnnotatedWith(AutoParcelMap.class);
+        Collection<? extends Element> annotatedElements = env.getElementsAnnotatedWith(AutoParcelMap.class);
         List<TypeElement> types = new ImmutableList.Builder<TypeElement>()
                 .addAll(ElementFilter.typesIn(annotatedElements))
                 .build();
@@ -155,10 +158,17 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
     }
 
     private void processType(TypeElement type) {
+        TypeElement mapFrom = getClassToMapFrom(type);
+        if (processing.contains(type)) {
+            return;
+        }
+        processing.add(type);
         AutoParcelMap autoParcelMap = type.getAnnotation(AutoParcelMap.class);
         if (autoParcelMap == null) {
-            mErrorReporter.abortWithError("annotation processor for @AutoParcel was invoked with a" +
-                    "type annotated differently; compiler bug? O_o", type);
+            mErrorReporter.abortWithError(
+                "annotation processor for @AutoParcel was invoked with a type annotated differently; compiler bug? O_o",
+                type
+            );
         }
         if (type.getKind() != ElementKind.CLASS) {
             mErrorReporter.abortWithError("@" + AutoParcelMap.class.getName() + " only applies to classes", type);
@@ -173,7 +183,8 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         String fqClassName = generatedSubclassName(type, 0);
         // class name
         String className = TypeUtil.simpleNameOf(fqClassName);
-        String source = generateClass(type, className, type.getSimpleName().toString(), false);
+
+        String source = generateClass(type, className, type.getSimpleName().toString(), false, mapFrom);
         source = Reformatter.fixup(source);
         writeSourceFile(fqClassName, source, type);
 
@@ -204,7 +215,6 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
     private boolean hasCustomMappingMethod(TypeElement type) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(type.getEnclosedElements());
         for (ExecutableElement method : methods) {
-            System.out.println("-------> Method: " + method.getSimpleName());
             if (method.getSimpleName().toString().equals("map")) {
                return true;
             }
@@ -213,7 +223,16 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         return false;
     }
 
-    private String generateClass(TypeElement type, String className, String classToExtend, boolean isFinal) {
+    private TypeElement getClassToMapFrom(TypeElement type) {
+        TypeMirror map = getMap(type.getAnnotation(AutoParcelMap.class));
+        if (map != null && map.getClass() != null && !map.getClass().getCanonicalName().equals(void.class.getCanonicalName())) {
+            return (TypeElement) processingEnv.getTypeUtils().asElement(map);
+        }
+
+        return null;
+    }
+
+    private String generateClass(TypeElement type, String className, String classToExtend, boolean isFinal, TypeElement mapFrom) {
         if (type == null) {
             mErrorReporter.abortWithError("generateClass was invoked with null type", type);
         }
@@ -226,17 +245,12 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         List<VariableElement> nonPrivateFields = new ArrayList<>();
         List<VariableElement> mappedOnlyFields = new ArrayList<>();
         addNonPrivateFields(type, nonPrivateFields);
-
         TypeElement sourceElement = null;
-        TypeMirror map = getMap(type.getAnnotation(AutoParcelMap.class));
-        if (map != null && map.getClass() != null && !map.getClass().getCanonicalName().equals(void.class.getCanonicalName())) {
-            Types typeUtils = processingEnv.getTypeUtils();
-            Element elm = typeUtils.asElement(map);
-            if (elm != null) {
-                addNonPrivateFields((TypeElement) elm, mappedOnlyFields);
-                nonPrivateFields.addAll(mappedOnlyFields);
-                sourceElement = (TypeElement) elm;
-            }
+
+        if (mapFrom != null) {
+            addNonPrivateFields((TypeElement) mapFrom, mappedOnlyFields);
+            nonPrivateFields.addAll(mappedOnlyFields);
+            sourceElement = (TypeElement) mapFrom;
         }
 
         if (nonPrivateFields.isEmpty()) {
@@ -420,7 +434,7 @@ public final class AutoParcelMapProcessor extends AbstractProcessor {
         String typeName = type.getSimpleName().toString();
         String name = prefix.trim() + typeName;
         if (finalName.equals(name)) {
-            throw new RuntimeException("You need to specify a different final name or a prefix");
+            mErrorReporter.abortWithError("You need to specify a different final name or a prefix", type);
         }
 
         return generatedClassName(type, Strings.repeat("$", depth) + (finalName.trim().length() > 0 ? finalName : name));
