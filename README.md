@@ -8,13 +8,13 @@ https://github.com/aitorvs/auto-parcel
 A fast annotation processor to make your objects `Parcelable` without
 writing any of the boilerplate.
 
-The project is inspired in [auto-value-parcel](https://github.com/rharter/auto-value-parcel/) 
+The project is inspired in [auto-value-parcel](https://github.com/rharter/auto-value-parcel/)
 extension and some of the code and utils are borrowed from it.
 
 ## Background
 
 [Parcelable](https://developer.android.com/reference/android/os/Parcelable.html) classes
-are great to put your objects into a [Bundle](https://developer.android.com/reference/android/os/Bundle.html) 
+are great to put your objects into a [Bundle](https://developer.android.com/reference/android/os/Bundle.html)
 and/or send them across an [Intent](https://developer.android.com/reference/android/content/Intent.html).
 But there is a non-negligible boilerplate one has to write to make a class
 parcelable and, let's be clear, nobody should ever need to write this code.
@@ -45,11 +45,11 @@ Add the following to gradle dependencies:
 
 ```gradle
 dependencies {
-    
+
     //... other dependencies here
-    
-    provided 'com.github.shehabic.auto-parcel-map:library:1.0.1'
-    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.1'
+
+    provided 'com.github.shehabic.auto-parcel-map:library:1.0.2'
+    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.2'
 }
 ```
 
@@ -57,8 +57,8 @@ The annotation processor requires [android-apt](https://bitbucket.org/hvisser/an
 
 ## Usage
 
-The use of the library is very simple. 
-Just create an abstract `Parcelable`-to-be class, annotate it with `@AutoParcel` and 
+The use of the library is very simple.
+Just create an abstract `Parcelable`-to-be class, annotate it with `@AutoParcel` and
 it will do the rest.
 
 ```java
@@ -71,8 +71,8 @@ public abstract class MappingPerson implements Parcelable { }
 AutoParcelMap will generate a parcelable class that extends from the abstract
 class you created. The generated class name follows the convention `AutoParcel_<YouClassName>`.
 
-You will need to add a convenience builder method (e.g. `creator`) that 
-calls the generated class constructor and that is all there is to it. 
+You will need to add a convenience builder method (e.g. `creator`) that
+calls the generated class constructor and that is all there is to it.
 
 You are ready now to e.g. send an instance of `Person` across an intent
 
@@ -80,11 +80,11 @@ You are ready now to e.g. send an instance of `Person` across an intent
 intent.putExtra(EXTRA_PERSON, (Parcelable) person);
 ```
 
-To avoid the need to cast `Person` to `(Parcelable)` just add `implements Parcelable` 
+To avoid the need to cast `Person` to `(Parcelable)` just add `implements Parcelable`
 to your abstract class definition. AutoParcel will detect it and do the rest anyway.
 
 ```
-@AutoParcel
+@AutoParcelMap
 public abstract class Person implements Parcelable {...}
 ```
 
@@ -93,8 +93,8 @@ they are not accessible from the generated class. Use either `protected` or `pub
 
 ## Parcel Adapters
 
-AutoParcel supports all types supported by [Parcel](https://developer.android.com/reference/android/os/Parcel.html)
-with the exception of `Map` -- why? read [here](https://developer.android.com/reference/android/os/Parcel.html). 
+AutoParcelMap supports all types supported by [Parcel](https://developer.android.com/reference/android/os/Parcel.html)
+with the exception of `Map` -- why? read [here](https://developer.android.com/reference/android/os/Parcel.html).
 
 At times you will also need to parcel more complex types. For that, use `ParcelAdapter`s.
 Let's see an example for a `Date` parcel adapter.
@@ -122,16 +122,16 @@ Now you can use your adapter into your classes.
 ```java
 import com.shehabic.autoparcel.AutoParcel;
 
-@AutoParcel
-public abstract class Person {
+@AutoParcelMap(finalName = "Person")
+public abstract class MappedPerson {
     @Nullable
     public String name;
     @ParcelAdapter(DateTypeAdapter.class)
     public Date birthday;
     public int age;
 
-    public static Person create(@NonNull String name, @NonNull Date birthday, int age) {
-        return new AutoParcel_Person(name, birthday, age);
+    public static MappedPerson create(@NonNull String name, @NonNull Date birthday, int age) {
+        return new Person(name, birthday, age);
     }
 }
 ```
@@ -140,7 +140,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.shehabic.auto-parcel:adapter:1.0.1'
+compile 'com.github.shehabic.auto-parcel:adapter:1.0.2'
 ```
 
 ## Version-able Parcels
@@ -148,17 +148,17 @@ compile 'com.github.shehabic.auto-parcel:adapter:1.0.1'
 **Use case**: your app issues a notification and within the pending intent, it parcels some model object.
 Overtime, your model changes, adding some new fields, so you update the app. A user of your app has a notification
 yet to be read but, before that happens, the app gets updated.
-Now when your user opens the notification, the new version of the app will try to render from the `Parcel` 
+Now when your user opens the notification, the new version of the app will try to render from the `Parcel`
 a different version of the of the object model...not good!
 
-Using `@ParcelVersion` field annotation in combination with the `version` 
+Using `@ParcelVersion` field annotation in combination with the `version`
 optional parameter in `@AutoParcel` class annotation you can render data from `Parcel`s with different
 versions.
 
 Let's say we have an object model `Person`.
 
 ```java
-@AutoParcel
+@AutoParcelMap
 public abstract class Person implements Parcelable {
     @NonNull
     public String name;
@@ -181,7 +181,7 @@ But we want our app to also render correctly previous object models (without the
 Easy, just update the model like this:
 
 ```java
-@AutoParcel(version = 1)
+@AutoParcelMap(version = 1, prefix = "FD")
 public abstract class Person implements Parcelable {
     @NonNull
     public String name;
@@ -196,7 +196,7 @@ public abstract class Person implements Parcelable {
     public int age;
 
     public static Person create(@NonNull String name, String lastName, @NonNull Date birthday, int age) {
-        return new AutoParcel_Person(name, lastName, birthday, age);
+        return new FDPerson(name, lastName, birthday, age);
     }
 }
 ```
@@ -209,9 +209,9 @@ The library will take care of the rest.
 
 ## Pitfalls
 
-- Bootstrap is somehow annoying because when typing your first `AutoParcel_Foo` 
+- Bootstrap is somehow annoying because when typing your first `AutoParcel_Foo`
 it will turn red in the IDE until the first build is performed.
-- Order of the constructor `AutoParcel_Foo` parameters is important and 
+- Order of the constructor `AutoParcel_Foo` parameters is important and
 according to their appearance in the source file.
 
 ## License
