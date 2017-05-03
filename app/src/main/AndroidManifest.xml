@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.shehabic.android.autoparcel">
+    package="de.foodora.android.automapper">
 
     <application
         android:allowBackup="true"
@@ -9,7 +9,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name="com.com.shehabic.android.autoparcel.MainActivity"
+            android:name="de.foodora.android.automapper.MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
@@ -18,7 +18,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.com.shehabic.android.autoparcel.PersonActivity"></activity>
+        <activity android:name="de.foodora.android.automapper.RestaurantActivity"></activity>
     </application>
 
 </manifest>
