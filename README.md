@@ -27,7 +27,7 @@ This is yet-another-parcelable-library that uses Android Studio
 annotation processors to generate your parcelable classes at compile time.
 
 ## Installation
-[![](https://jitpack.io/v/shehabic/auto-parcel-map.svg)](https://jitpack.io/#shehabic/auto-parcel-map)
+[![](https://jitpack.io/v/foodora/android-auto-mapper.svg)](https://jitpack.io/#foodora/android-auto-mapper)
 
 ### Repository
 
@@ -48,8 +48,8 @@ dependencies {
 
     //... other dependencies here
 
-    provided 'com.github.shehabic.auto-parcel-map:library:1.0.3'
-    apt 'com.github.shehabic.auto-parcel-map:compiler:1.0.3'
+    provided 'com.github.foodora.android-auto-mapper:library:1.0.3'
+    apt 'com.github.foodora.android-auto-mapper:compiler:1.0.3'
 }
 ```
 
@@ -62,13 +62,13 @@ Just create an abstract `Parcelable`-to-be class, annotate it with `@AutoParcel`
 it will do the rest.
 
 ```java
-import com.shehabic.autoparcel.AutoParcelMap;
+import de.foodora.automapper.AutoMapper;
 
-@AutoParcelMap(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix", finalName = "OrSimplyFinalClassName")
+@AutoMapper(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix", finalName = "OrSimplyFinalClassName")
 public abstract class MappingPerson implements Parcelable { }
 ```
 
-AutoParcelMap will generate a parcelable class that extends from the abstract
+AutoMapper will generate a parcelable class that extends from the abstract
 class you created. The generated class name follows the convention `AutoParcel_<YouClassName>`.
 
 You will need to add a convenience builder method (e.g. `creator`) that
@@ -84,7 +84,7 @@ To avoid the need to cast `Person` to `(Parcelable)` just add `implements Parcel
 to your abstract class definition. AutoParcel will detect it and do the rest anyway.
 
 ```
-@AutoParcelMap
+@AutoMapper
 public abstract class Person implements Parcelable {...}
 ```
 
@@ -93,7 +93,7 @@ they are not accessible from the generated class. Use either `protected` or `pub
 
 ## Parcel Adapters
 
-AutoParcelMap supports all types supported by [Parcel](https://developer.android.com/reference/android/os/Parcel.html)
+AutoMapper supports all types supported by [Parcel](https://developer.android.com/reference/android/os/Parcel.html)
 with the exception of `Map` -- why? read [here](https://developer.android.com/reference/android/os/Parcel.html).
 
 At times you will also need to parcel more complex types. For that, use `ParcelAdapter`s.
@@ -101,7 +101,7 @@ Let's see an example for a `Date` parcel adapter.
 
 ```java
 import android.os.Parcel;
-import com.shehabic.autoparcel.ParcelTypeAdapter;
+import de.foodora.automapper.ParcelTypeAdapter;
 import java.util.Date;
 
 class DateTypeAdapter implements ParcelTypeAdapter<Date> {
@@ -120,9 +120,9 @@ class DateTypeAdapter implements ParcelTypeAdapter<Date> {
 Now you can use your adapter into your classes.
 
 ```java
-import com.shehabic.autoparcel.AutoParcel;
+import de.foodora.automapper.AutoParcel;
 
-@AutoParcelMap(finalName = "Person")
+@AutoMapper(finalName = "Person")
 public abstract class MappedPerson {
     @Nullable
     public String name;
@@ -140,7 +140,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.shehabic.auto-parcel:adapter:1.0.3'
+compile 'com.github.foodora.android-auto-mapper:adapter:1.0.3'
 ```
 
 ## Version-able Parcels
@@ -158,7 +158,7 @@ versions.
 Let's say we have an object model `Person`.
 
 ```java
-@AutoParcelMap
+@AutoMapper
 public abstract class Person implements Parcelable {
     @NonNull
     public String name;
@@ -181,7 +181,7 @@ But we want our app to also render correctly previous object models (without the
 Easy, just update the model like this:
 
 ```java
-@AutoParcelMap(version = 1, prefix = "FD")
+@AutoMapper(version = 1, prefix = "FD")
 public abstract class Person implements Parcelable {
     @NonNull
     public String name;
