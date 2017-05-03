@@ -1,8 +1,7 @@
 package de.foodora.android.automapper.model;
 
 /*
- * Copyright (C) 03/05/17 shehabic
- * Copyright (C) 31/07/16 aitorvs
+ * Copyright (C) 03/05/17 Foodora GmbH
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

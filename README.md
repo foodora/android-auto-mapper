@@ -1,14 +1,9 @@
-# Notice
-Based on the great work from :
-https://github.com/aitorvs/auto-parcel
+# Auto-Mapper
 
+A fast annotation processor to creating fluent automated compile-time mappers from one object to another, as well as
+`Parcelable` without writing any of the boilerplate.
 
-# Auto-Parcel-Map
-
-A fast annotation processor to make your objects `Parcelable` without
-writing any of the boilerplate.
-
-The project is inspired in [auto-value-parcel](https://github.com/rharter/auto-value-parcel/)
+The project is inspired in [auto-value-parcel](https://github.com/aitorvs/auto-parcel)
 extension and some of the code and utils are borrowed from it.
 
 ## Background
@@ -218,20 +213,6 @@ according to their appearance in the source file.
 
 ```
 Copyright 2017 Mohamed Shehab Osman.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Copyright 2016 Aitor Viana Sánchez.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

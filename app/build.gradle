@@ -9,7 +9,7 @@ android {
     compileSdkVersion 24
     buildToolsVersion '25.0.0'
     defaultConfig {
-        applicationId 'com.shehabic.autoparcelmap'
+        applicationId 'de.foodora.automapper'
         minSdkVersion 19
         targetSdkVersion 24
         versionCode 1
