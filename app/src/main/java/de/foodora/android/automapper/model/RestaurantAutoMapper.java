@@ -20,7 +20,7 @@ import android.os.Parcelable;
 
 import de.foodora.automapper.AutoMapper;
 
-@AutoMapper(map = ApiRestaurant.class, finalName = "Restaurant")
+@AutoMapper(map = ApiRestaurant.class, targetName = "Restaurant")
 public abstract class RestaurantAutoMapper implements Parcelable {
 
     public String frontSign;

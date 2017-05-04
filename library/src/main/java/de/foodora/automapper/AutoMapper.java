@@ -20,6 +20,6 @@ public @interface AutoMapper {
     int version() default 0;
     Class<?> map() default void.class;
     String prefix() default "FD";
-    String finalName() default "";
+    String targetName() default "";
     boolean parcelable() default false;
 }

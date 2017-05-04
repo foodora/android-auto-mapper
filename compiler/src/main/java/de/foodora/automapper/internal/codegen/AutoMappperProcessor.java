@@ -430,7 +430,7 @@ public final class AutoMappperProcessor extends AbstractProcessor {
 
     private String generatedSubclassName(TypeElement type, int depth) {
         String prefix = type.getAnnotation(AutoMapper.class).prefix();
-        String finalName = type.getAnnotation(AutoMapper.class).finalName();
+        String finalName = type.getAnnotation(AutoMapper.class).targetName();
         String typeName = type.getSimpleName().toString();
         String name = prefix.trim() + typeName;
         if (finalName.equals(name)) {
