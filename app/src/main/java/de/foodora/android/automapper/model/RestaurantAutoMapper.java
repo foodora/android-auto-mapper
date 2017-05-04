@@ -16,12 +16,10 @@ package de.foodora.android.automapper.model;
  * limitations under the License.
  */
 
-import android.os.Parcelable;
-
 import de.foodora.automapper.AutoMapper;
 
-@AutoMapper(map = ApiRestaurant.class, targetName = "Restaurant")
-public abstract class RestaurantAutoMapper implements Parcelable {
+@AutoMapper(map = ApiRestaurant.class, targetName = "Restaurant", parcelable = true)
+public abstract class RestaurantAutoMapper {
 
     public String frontSign;
 

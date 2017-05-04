@@ -43,8 +43,8 @@ dependencies {
 
     //... other dependencies here
 
-    provided 'com.github.foodora.android-auto-mapper:library:1.0.4'
-    apt 'com.github.foodora.android-auto-mapper:compiler:1.0.4'
+    provided 'com.github.foodora.android-auto-mapper:library:1.0.5'
+    apt 'com.github.foodora.android-auto-mapper:compiler:1.0.5'
 }
 ```
 
@@ -135,7 +135,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.foodora.android-auto-mapper:adapter:1.0.4'
+compile 'com.github.foodora.android-auto-mapper:adapter:1.0.5'
 ```
 
 ## Version-able Parcels

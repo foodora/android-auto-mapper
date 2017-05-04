@@ -245,12 +245,10 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         List<VariableElement> nonPrivateFields = new ArrayList<>();
         List<VariableElement> mappedOnlyFields = new ArrayList<>();
         addNonPrivateFields(type, nonPrivateFields);
-        TypeElement sourceElement = null;
 
         if (mapFrom != null) {
-            addNonPrivateFields((TypeElement) mapFrom, mappedOnlyFields);
+            addNonPrivateFields(mapFrom, mappedOnlyFields);
             nonPrivateFields.addAll(mappedOnlyFields);
-            sourceElement = (TypeElement) mapFrom;
         }
 
         if (nonPrivateFields.isEmpty()) {
@@ -268,6 +266,8 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         // get the parcel version
         //noinspection ConstantConditions
         int version = type.getAnnotation(AutoMapper.class).version();
+        boolean isImplementingParcelable = ancestoIsParcelable(processingEnv, type);
+        boolean isParcelable = isImplementingParcelable || type.getAnnotation(AutoMapper.class).parcelable();
 
         // Generate the AutoParcel_??? class
         String pkg = TypeUtil.packageNameOf(type);
@@ -283,30 +283,34 @@ public final class AutoMappperProcessor extends AbstractProcessor {
                 .addMethod(generateConstructor(properties))
                 // Add the private constructor
                 .addMethod(generateConstructorFromParcel(processingEnv, properties, typeAdapters))
-                // overrides describeContents()
-                .addMethod(generateDescribeContents())
-                // static final CREATOR
-                .addField(generateCreator(processingEnv, properties, classTypeName, typeAdapters))
-                // overrides writeToParcel()
-                .addMethod(generateWriteToParcel(version, processingEnv, properties, typeAdapters)) // generate writeToParcel()
                 // create empty constructor
                 .addMethod(MethodSpec.constructorBuilder().addModifiers(PUBLIC).build())
                 // Add fields from mapping only
                 .addFields(generateFieldSpecs(properties))
                 // Add map from constructor
-                .addMethod(generateMapFromCreator(type, classTypeName, sourceElement, mappedProperties));
+                .addMethod(generateMapFromCreator(type, classTypeName, mapFrom, mappedProperties));
 
-        if (!ancestoIsParcelable(processingEnv, type)) {
-            // Implement android.os.Parcelable if the ancestor does not do it.
-            subClass.addSuperinterface(ClassName.get("android.os", "Parcelable"));
+        if (isParcelable) {
+            subClass
+                // overrides describeContents()
+                .addMethod(generateDescribeContents())
+                // static final CREATOR
+                .addField(generateCreator(processingEnv, properties, classTypeName, typeAdapters))
+                // overrides writeToParcel()
+                .addMethod(generateWriteToParcel(version, processingEnv, properties, typeAdapters));
+
+            if (!isImplementingParcelable) {
+                // Implement android.os.Parcelable if the ancestor does not do it.
+                subClass.addSuperinterface(ClassName.get("android.os", "Parcelable"));
+            }
         }
 
         if (!typeAdapters.isEmpty()) {
             typeAdapters.values().forEach(subClass::addField);
         }
 
-
         JavaFile javaFile = JavaFile.builder(pkg, subClass.build()).build();
+
         return javaFile.toString();
     }
 
