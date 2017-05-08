@@ -50,13 +50,8 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     int age = TextUtils.isEmpty(mAgeEditText.getText()) ? 0 : Integer.parseInt(mAgeEditText.getText().toString());
                     Date date = TextUtils.isEmpty(mBdayEditText.getText()) ? new Date(System.currentTimeMillis()) : df.parse(mBdayEditText.getText().toString());
-                    Address address = Address.create(
-                            mStreetEditText.getText().toString(),
-                            mPostcodeEditText.getText().toString(),
-                            mCityEditText.getText().toString(),
-                            /* Country */ null);
+                    Address address = new Address();
                     Restaurant restaurant = new Restaurant();
-
                     Intent activityIntent = RestaurantActivity.createIntent(MainActivity.this, restaurant);
 
                     if (activityIntent != null) {

@@ -18,8 +18,9 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 public @interface AutoMapper {
     int version() default 0;
-    Class<?> map() default void.class;
-    String prefix() default "FD";
-    String targetName() default "";
+    Class<?> mapFrom() default void.class;
+    String prefix() default "Mapped";
+    String mapTo() default "";
     boolean parcelable() default false;
+    boolean extendMapper() default true;
 }

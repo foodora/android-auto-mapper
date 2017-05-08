@@ -16,13 +16,11 @@ package de.foodora.android.automapper.model;
  * limitations under the License.
  */
 
-import android.os.Parcelable;
 import android.support.annotation.NonNull;
 
-import de.foodora.automapper.AutoMapper;
+import de.foodora.android.automapper.model.location.ApiArea;
 
-@AutoMapper(parcelable = true)
-public abstract class Address implements Parcelable {
+public class ApiAddress {
     @NonNull
     public String street;
 
@@ -32,7 +30,5 @@ public abstract class Address implements Parcelable {
 
     public String country;
 
-    public static Address create(@NonNull String street, String postCode, String city, String country) {
-        return new FDAddress(street, postCode, city, country);
-    }
+    public ApiArea area;
 }

@@ -3,7 +3,6 @@ package de.foodora.android.automapper;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -11,21 +10,20 @@ import android.text.TextUtils;
 import android.widget.TextView;
 
 import de.foodora.android.automapper.model.Restaurant;
-import de.foodora.android.automapper.model.RestaurantAutoMapper;
 
 public class RestaurantActivity extends AppCompatActivity {
 
     private static final String EXTRA_PERSON = "EXTRA_PERSON";
 
     @Nullable
-    public static Intent createIntent(@NonNull Context context, RestaurantAutoMapper person) {
+    public static Intent createIntent(@NonNull Context context, Restaurant restaurant) {
         //noinspection ConstantConditions
         if (context == null) {
             return null;
         }
         Intent intent = new Intent(context, RestaurantActivity.class);
         // we need to cast it to Parcelable because Person does not itself implement parcelable
-        intent.putExtra(EXTRA_PERSON, (Parcelable) person);
+//        intent.putExtra(EXTRA_PERSON, (Parcelable) person);
 
         return intent;
     }

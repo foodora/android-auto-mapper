@@ -19,5 +19,5 @@ public class ApiRestaurant {
 
     public int branches;
 
-    public Address address;
+    public ApiAddress address;
 }

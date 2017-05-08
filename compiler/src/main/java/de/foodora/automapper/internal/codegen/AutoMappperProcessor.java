@@ -1,21 +1,5 @@
 package de.foodora.automapper.internal.codegen;
 
-/*
- * Copyright (C) 03/05/17 Foodora GmbH
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -69,6 +53,7 @@ import javax.tools.JavaFileObject;
 import de.foodora.automapper.AutoMapper;
 import de.foodora.automapper.ParcelAdapter;
 import de.foodora.automapper.ParcelVersion;
+import de.foodora.automapper.internal.codegen.dependencygraph.DependencySolver;
 import de.foodora.automapper.internal.common.MoreElements;
 
 import static javax.lang.model.element.Modifier.FINAL;
@@ -80,8 +65,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 public final class AutoMappperProcessor extends AbstractProcessor {
     private ErrorReporter mErrorReporter;
     private Types mTypeUtils;
-    private final Map<String, TypeElement> generated = new HashMap<>();
-    private final Set<TypeElement> processing = new HashSet<>();
+    private DependencySolver dependencyResolver;
 
     static final class Property {
         final String fieldName;
@@ -89,13 +73,15 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         final TypeName typeName;
         final ImmutableSet<String> annotations;
         final int version;
+        final boolean isMapped;
         TypeMirror typeAdapter;
 
-        Property(String fieldName, VariableElement element) {
+        Property(String fieldName, TypeName typeName, VariableElement element, boolean isMapped) {
             this.fieldName = fieldName;
             this.element = element;
-            this.typeName = TypeName.get(element.asType());
+            this.typeName = typeName;
             this.annotations = getAnnotations(element);
+            this.isMapped = isMapped;
 
             // get the parcel adapter if any
             ParcelAdapter parcelAdapter = element.getAnnotation(ParcelAdapter.class);
@@ -110,6 +96,10 @@ public final class AutoMappperProcessor extends AbstractProcessor {
             // get the element version, default 0
             ParcelVersion parcelVersion = element.getAnnotation(ParcelVersion.class);
             this.version = parcelVersion == null ? 0 : parcelVersion.from();
+        }
+
+        Property(String fieldName, VariableElement element) {
+            this(fieldName, TypeName.get(element.asType()), element, false);
         }
 
         public boolean isNullable() {
@@ -135,6 +125,7 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         super.init(processingEnv);
         mErrorReporter = new ErrorReporter(processingEnv);
         mTypeUtils = processingEnv.getTypeUtils();
+        dependencyResolver = new DependencySolver(processingEnv);
     }
 
     @Override
@@ -148,21 +139,72 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         List<TypeElement> types = new ImmutableList.Builder<TypeElement>()
                 .addAll(ElementFilter.typesIn(annotatedElements))
                 .build();
-
+        Set<TypeElement> mappedElements = new HashSet<>();
+        Map<TypeElement, String> elementTargetNames = new HashMap<>();
+        Map<TypeElement, TypeElement> mapFromExtends = new HashMap<>();
+        TypeElement mapperElement = null;
         for (TypeElement type : types) {
-            processType(type);
+            TypeElement mapFrom = getClassToMapFrom(type);
+            if (mapFrom != null) {
+                AutoMapper autoMapper = type.getAnnotation(AutoMapper.class);
+                if (autoMapper.extendMapper()) {
+                    mapFromExtends.put(mapFrom, type);
+                }
+                elementTargetNames.put(mapFrom, getMappingTargetFullClassName(type, mapFrom));
+                mappedElements.add(mapFrom);
+                mapperElement = type;
+            }
+        }
+        List<TypeElement> topologicalMappedElements = dependencyResolver.resolveAllDependencies(mappedElements);
+        completeElementTargetName(mapperElement, topologicalMappedElements, elementTargetNames);
+
+        if (topologicalMappedElements.size() > 0) {
+            processMappingElements(elementTargetNames, mapFromExtends, topologicalMappedElements, types.get(0));
+        } else {
+            for (TypeElement type : types) {
+                processType(type, new HashMap<>());
+            }
         }
 
         // We are the only ones handling AutoParcel annotations
         return true;
     }
 
-    private void processType(TypeElement type) {
-        TypeElement mapFrom = getClassToMapFrom(type);
-        if (processing.contains(type)) {
-            return;
+    private void processMappingElements(
+        Map<TypeElement, String> elementTargetNames,
+        Map<TypeElement, TypeElement> mapFromExtends,
+        List<TypeElement> topologicalMappedElements,
+        TypeElement baseElement
+    ) {
+        for (TypeElement mappedElement : topologicalMappedElements) {
+            TypeElement extendElement = mapFromExtends.get(mappedElement);
+            processMapping(
+                extendElement != null ? extendElement : baseElement,
+                mappedElement,
+                elementTargetNames.get(mappedElement),
+                (extendElement != null ? extendElement.asType().toString() : null),
+                elementTargetNames
+            );
         }
-        processing.add(type);
+    }
+
+    private void processMapping(
+        TypeElement baseElement,
+        TypeElement mapFrom,
+        String targetName,
+        String extend,
+        Map<TypeElement, String> elementTargetNames
+    ) {
+        if (extend != null) {
+            checkModifiersIfNested(baseElement);
+        }
+        String source = generateClass(baseElement, TypeUtil.simpleNameOf(targetName), extend, mapFrom, elementTargetNames);
+        source = Reformatter.fixup(source);
+        writeSourceFile(targetName, source, baseElement);
+    }
+
+    private void processType(TypeElement type, Map<TypeElement, String> elementTargetNames) {
+        TypeElement mapFrom = getClassToMapFrom(type);
         AutoMapper autoMapper = type.getAnnotation(AutoMapper.class);
         if (autoMapper == null) {
             mErrorReporter.abortWithError(
@@ -184,7 +226,7 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         // class name
         String className = TypeUtil.simpleNameOf(fqClassName);
 
-        String source = generateClass(type, className, type.getSimpleName().toString(), false, mapFrom);
+        String source = generateClass(type, className, type.getSimpleName().toString(), mapFrom, elementTargetNames);
         source = Reformatter.fixup(source);
         writeSourceFile(fqClassName, source, type);
 
@@ -232,19 +274,18 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         return null;
     }
 
-    private String generateClass(TypeElement type, String className, String classToExtend, boolean isFinal, TypeElement mapFrom) {
+    private String generateClass(TypeElement type, String className, String classToExtend, TypeElement mapFrom, Map<TypeElement, String> elementTargetNames) {
         if (type == null) {
             mErrorReporter.abortWithError("generateClass was invoked with null type", type);
         }
         if (className == null) {
             mErrorReporter.abortWithError("generateClass was invoked with null class name", type);
         }
-        if (classToExtend == null) {
-            mErrorReporter.abortWithError("generateClass was invoked with null parent class", type);
-        }
         List<VariableElement> nonPrivateFields = new ArrayList<>();
         List<VariableElement> mappedOnlyFields = new ArrayList<>();
-        addNonPrivateFields(type, nonPrivateFields);
+        if (classToExtend != null) {
+            addNonPrivateFields(type, nonPrivateFields);
+        }
 
         if (mapFrom != null) {
             addNonPrivateFields(mapFrom, mappedOnlyFields);
@@ -256,53 +297,60 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         }
 
         // get the properties
-        ImmutableList<Property> properties = buildProperties(nonPrivateFields);
+        ImmutableList<Property> properties = buildProperties(nonPrivateFields, elementTargetNames);
 
-        ImmutableList<Property> mappedProperties = buildProperties(mappedOnlyFields);
+        ImmutableList<Property> mappedProperties = buildProperties(mappedOnlyFields, elementTargetNames);
 
         // get the type adapters
         ImmutableMap<TypeMirror, FieldSpec> typeAdapters = getTypeAdapters(properties);
 
         // get the parcel version
         //noinspection ConstantConditions
-        int version = type.getAnnotation(AutoMapper.class).version();
+//        int version = type.getAnnotation(AutoMapper.class).version();
         boolean isImplementingParcelable = ancestoIsParcelable(processingEnv, type);
         boolean isParcelable = isImplementingParcelable || type.getAnnotation(AutoMapper.class).parcelable();
 
         // Generate the AutoParcel_??? class
-        String pkg = TypeUtil.packageNameOf(type);
+        String pkg = generatePackageName(type, elementTargetNames.get(mapFrom));
         TypeName classTypeName = ClassName.get(pkg, className);
         TypeSpec.Builder subClass = TypeSpec.classBuilder(className)
-                // Add the version
-                .addField(TypeName.INT, "version", PRIVATE)
                 // Class must be always final
                 .addModifiers(new Modifier[]{FINAL, PUBLIC})
-                // extends from original abstract class
-                .superclass(ClassName.get(pkg, classToExtend))
                 // Add the DEFAULT constructor
                 .addMethod(generateConstructor(properties))
-                // Add the private constructor
-                .addMethod(generateConstructorFromParcel(processingEnv, properties, typeAdapters))
                 // create empty constructor
                 .addMethod(MethodSpec.constructorBuilder().addModifiers(PUBLIC).build())
                 // Add fields from mapping only
-                .addFields(generateFieldSpecs(properties))
-                // Add map from constructor
-                .addMethod(generateMapFromCreator(type, classTypeName, mapFrom, mappedProperties));
+                .addFields(generateFieldSpecs(properties/*, elementTargetNames*/))
+                // Add mapFrom from constructor
+                .addMethod(
+                    generateMapFromCreator(
+                        classToExtend != null ? type : null,
+                        classTypeName,
+                        mapFrom,
+                        mappedProperties,
+                        elementTargetNames
+                    )
+                );
+
+        if (classToExtend != null) {
+            // extends from original abstract class
+            subClass.superclass(ClassName.get(pkg, classToExtend));
+        }
 
         if (isParcelable) {
             subClass
+                // Add the private constructor
+                .addMethod(generateConstructorFromParcel(processingEnv, properties, typeAdapters))
                 // overrides describeContents()
                 .addMethod(generateDescribeContents())
                 // static final CREATOR
                 .addField(generateCreator(processingEnv, properties, classTypeName, typeAdapters))
                 // overrides writeToParcel()
-                .addMethod(generateWriteToParcel(version, processingEnv, properties, typeAdapters));
+                .addMethod(generateWriteToParcel(0, processingEnv, properties, typeAdapters))
+            ;
 
-            if (!isImplementingParcelable) {
-                // Implement android.os.Parcelable if the ancestor does not do it.
-                subClass.addSuperinterface(ClassName.get("android.os", "Parcelable"));
-            }
+            subClass.addSuperinterface(ClassName.get("android.os", "Parcelable"));
         }
 
         if (!typeAdapters.isEmpty()) {
@@ -312,6 +360,10 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         JavaFile javaFile = JavaFile.builder(pkg, subClass.build()).build();
 
         return javaFile.toString();
+    }
+
+    private String generatePackageName(TypeElement type, String targetName) {
+        return targetName != null ? ClassName.bestGuess(targetName).packageName() : TypeUtil.packageNameOf(type);
     }
 
     private ImmutableMap<TypeMirror, FieldSpec> getTypeAdapters(ImmutableList<Property> properties) {
@@ -332,10 +384,46 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         return ImmutableMap.copyOf(typeAdapters);
     }
 
-    private ImmutableList<Property> buildProperties(List<VariableElement> elements) {
+    private ImmutableList<Property> buildProperties(List<VariableElement> elements, Map<TypeElement, String> elementTargetNames) {
         ImmutableList.Builder<Property> builder = ImmutableList.builder();
+        String fieldName;
+        TypeElement typeElement;
         for (VariableElement element : elements) {
-            builder.add(new Property(element.getSimpleName().toString(), element));
+            fieldName = element.getSimpleName().toString();
+            typeElement = processingEnv.getElementUtils().getTypeElement(element.asType().toString());
+            if (TypeUtil.isIterable(element)) {
+                Element enclosedElement = TypeUtil.getGenericElement(element, processingEnv.getElementUtils());
+                if (enclosedElement instanceof TypeElement && elementTargetNames.containsKey(enclosedElement)) {
+                    TypeName rawType = TypeUtil.getRawTypeOfIterable(element);
+                    ClassName collection = ClassName.bestGuess(rawType.toString());
+                    String target = elementTargetNames.get(enclosedElement);
+                    if (target != null) {
+                        TypeName finalCollection = ParameterizedTypeName.get(collection, ClassName.bestGuess(target));
+                        builder.add(new Property(fieldName, finalCollection, element, true));
+                        continue;
+                    }
+                }
+            } else if (TypeUtil.isArray(element)) {
+                Element enclosedElement = TypeUtil.getEnclosedArrayElement(element, processingEnv.getElementUtils());
+                if (enclosedElement != null && elementTargetNames.containsKey(enclosedElement)) {
+                    ClassName className = ClassName.bestGuess(elementTargetNames.get(enclosedElement));
+                    ArrayTypeName mappedArray = ArrayTypeName.of(className);
+                    builder.add(new Property(fieldName, mappedArray, element, true));
+                    continue;
+                }
+            } else if (elementTargetNames.containsKey(typeElement)) {
+                Element mapped = processingEnv.getElementUtils().getTypeElement(elementTargetNames.get(typeElement));
+                builder.add(
+                    new Property(
+                        fieldName,
+                        (mapped != null ? TypeName.get(mapped.asType()) : ClassName.bestGuess(elementTargetNames.get(typeElement))),
+                        (mapped != null ? (VariableElement) mapped : element),
+                        true
+                    )
+                );
+                continue;
+            }
+            builder.add(new Property(fieldName, element));
         }
 
         return builder.build();
@@ -395,36 +483,35 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         // get a code block builder
         CodeBlock.Builder block = CodeBlock.builder();
 
-        // First thing is reading the Parcelable object version
-        block.add("this.version = in.readInt();\n");
-
-        // FIXME: 31/07/16 remove if not used
-        boolean requiresSuppressWarnings = false;
+//        // First thing is reading the Parcelable object version
+//        block.add("this.version = in.readInt();\n");
 
         // Now, iterate all properties, check the version initialize them
         for (Property p : properties) {
 
-            // get the property version
-            int pVersion = p.version();
-            if (pVersion > 0) {
-                block.beginControlFlow("if (this.version >= $L)", pVersion);
-            }
+//            // get the property version
+//            int pVersion = p.version();
+//            if (pVersion > 0) {
+//                block.beginControlFlow("if (this.version >= $L)", pVersion);
+//            }
 
             block.add("this.$N = ", p.fieldName);
 
             if (p.typeAdapter != null && typeAdapters.containsKey(p.typeAdapter)) {
                 Parcelables.readValueWithTypeAdapter(block, p, typeAdapters.get(p.typeAdapter));
             } else {
-                requiresSuppressWarnings |= Parcelables.isTypeRequiresSuppressWarnings(p.typeName);
                 TypeName parcelableType = Parcelables.getTypeNameFromProperty(p, env.getTypeUtils());
+                if (parcelableType == null) {
+                    mErrorReporter.abortWithError("could not create parcelable for type " + p.typeName, p.element);
+                }
                 Parcelables.readValue(block, p, parcelableType);
             }
 
             block.add(";\n");
 
-            if (pVersion > 0) {
-                block.endControlFlow();
-            }
+//            if (pVersion > 0) {
+//                block.endControlFlow();
+//            }
         }
 
         builder.addCode(block.build());
@@ -434,7 +521,7 @@ public final class AutoMappperProcessor extends AbstractProcessor {
 
     private String generatedSubclassName(TypeElement type, int depth) {
         String prefix = type.getAnnotation(AutoMapper.class).prefix();
-        String finalName = type.getAnnotation(AutoMapper.class).targetName();
+        String finalName = type.getAnnotation(AutoMapper.class).mapTo();
         String typeName = type.getSimpleName().toString();
         String name = prefix.trim() + typeName;
         if (finalName.equals(name)) {
@@ -455,10 +542,11 @@ public final class AutoMappperProcessor extends AbstractProcessor {
     }
 
     private MethodSpec generateWriteToParcel(
-            int version,
-            ProcessingEnvironment env,
-            ImmutableList<Property> properties,
-            ImmutableMap<TypeMirror, FieldSpec> typeAdapters) {
+        int version,
+        ProcessingEnvironment env,
+        ImmutableList<Property> properties,
+        ImmutableMap<TypeMirror, FieldSpec> typeAdapters
+    ) {
         ParameterSpec dest = ParameterSpec
                 .builder(ClassName.get("android.os", "Parcel"), "dest")
                 .build();
@@ -468,9 +556,9 @@ public final class AutoMappperProcessor extends AbstractProcessor {
                 .addModifiers(PUBLIC)
                 .addParameter(dest)
                 .addParameter(flags);
-
-        // write first the parcelable object version...
-        builder.addCode(Parcelables.writeVersion(version, dest));
+//
+//        // write first the parcelable object version...
+//        builder.addCode(Parcelables.writeVersion(version, dest));
 
         // ...then write all the properties
         for (Property p : properties) {
@@ -495,10 +583,11 @@ public final class AutoMappperProcessor extends AbstractProcessor {
     }
 
     private FieldSpec generateCreator(
-            ProcessingEnvironment env,
-            ImmutableList<Property> properties,
-            TypeName type,
-            ImmutableMap<TypeMirror, FieldSpec> typeAdapters) {
+        ProcessingEnvironment env,
+        ImmutableList<Property> properties,
+        TypeName type,
+        ImmutableMap<TypeMirror, FieldSpec> typeAdapters
+    ) {
         ClassName creator = ClassName.bestGuess("android.os.Parcelable.Creator");
         TypeName creatorOfClass = ParameterizedTypeName.get(creator, type);
 
@@ -583,17 +672,21 @@ public final class AutoMappperProcessor extends AbstractProcessor {
     private Iterable<FieldSpec> generateFieldSpecs(ImmutableList<Property> properties) {
         List<FieldSpec> fields = new ArrayList<>();
         for (Property property : properties) {
-            fields.add(
-                FieldSpec.builder(property.typeName, property.fieldName, new Modifier[]{PUBLIC}).build()
-            );
+            fields.add(FieldSpec.builder(property.typeName, property.fieldName, new Modifier[]{PUBLIC}).build());
         }
 
         return fields;
     }
 
-    private MethodSpec generateMapFromCreator(TypeElement type, TypeName typeName, TypeElement source, Iterable<Property> params) {
+    private MethodSpec generateMapFromCreator(
+        TypeElement classToExtend,
+        TypeName typeName,
+        TypeElement source,
+        Iterable<Property> params,
+        Map<TypeElement, String> elementTargetNames
+    ) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder("mapFrom")
-            .addModifiers(new Modifier[]{STATIC, PUBLIC, FINAL})
+            .addModifiers(STATIC, PUBLIC, FINAL)
             .returns(typeName);
 
         if (source != null) {
@@ -601,9 +694,45 @@ public final class AutoMappperProcessor extends AbstractProcessor {
 
             builder.addStatement("$T mapped = new $T()", typeName, typeName);
             for (Property param : params) {
-                builder.addStatement("mapped.$N = source.$N", param.fieldName, param.fieldName);
+                if (param.isMapped) {
+                    if (TypeUtil.isIterable(param.element)) {
+                        Element enclosedElement = TypeUtil.getGenericElement(param.element, processingEnv.getElementUtils());
+                        if (enclosedElement instanceof TypeElement && elementTargetNames.containsKey(enclosedElement)) {
+                            String target = elementTargetNames.get(enclosedElement);
+                            TypeName rawType = TypeUtil.getRawTypeOfIterable(param.element);
+                            String collectionName = TypeUtil.simpleNameOf(rawType.toString());
+                            if (target != null) {
+                                TypeName enclosedMapperType = ClassName.bestGuess(target);
+                                builder.addStatement("mapped.$N = $T.$N()", param.fieldName, ClassName.bestGuess("java.util.Collections"), getEmptyIteratorMethodName(collectionName));
+                                builder.beginControlFlow("if (source.$N != null)", param.fieldName);
+                                builder.beginControlFlow("for ($T item : source.$N)", enclosedElement.asType(), param.fieldName);
+                                builder.addStatement("mapped.$N.add($T.mapFrom(item))",param.fieldName, enclosedMapperType);
+                                builder.endControlFlow();
+                                builder.endControlFlow();
+                                continue;
+                            }
+                        }
+                    } else if (TypeUtil.isArray(param.element)) {
+                        Element enclosedElement = TypeUtil.getEnclosedArrayElement(param.element, processingEnv.getElementUtils());
+                        if (enclosedElement != null && elementTargetNames.containsKey(enclosedElement)) {
+                            ClassName className = ClassName.bestGuess(elementTargetNames.get(enclosedElement));
+                            builder.beginControlFlow("if (source.$N != null)", param.fieldName);
+                            builder.addStatement("mapped.$N = new $T[source.$N.length]", param.fieldName, className, param.fieldName);
+                            builder.beginControlFlow("for (int i = 0; i < source.$N.length; i++)", param.fieldName);
+                            builder.addStatement("mapped.$N[i] = $T.mapFrom(source.$N[i])", param.fieldName, className, param.fieldName);
+                            builder.endControlFlow();
+                            builder.nextControlFlow("else");
+                            builder.addStatement("mapped.$N = null", param.fieldName);
+                            builder.endControlFlow();
+                            continue;
+                        }
+                    }
+                    builder.addStatement("mapped.$N = $T.mapFrom(source.$N)",param.fieldName, param.typeName, param.fieldName);
+                } else {
+                    builder.addStatement("mapped.$N = source.$N", param.fieldName, param.fieldName);
+                }
             }
-            if (hasCustomMappingMethod(type)) {
+            if (classToExtend != null && hasCustomMappingMethod(classToExtend)) {
                 builder.addStatement("mapped.map(mapped)");
             }
 
@@ -615,11 +744,34 @@ public final class AutoMappperProcessor extends AbstractProcessor {
         return builder.build();
     }
 
+    private String getEmptyIteratorMethodName(String collectionName) {
+        switch (collectionName) {
+            case "List":
+            case "Collection":
+                return "emptyList";
+
+            case "Set":
+                return "emptySet";
+
+            case "ArrayList":
+                return "ArrayList";
+
+            case "Map":
+                return "emptyMap";
+
+            default:
+                throw new RuntimeException("Collection type `" + collectionName + "` not supported");
+        }
+
+
+    }
+
     private static TypeMirror getMap(AutoMapper annotation) {
         try {
-            annotation.map(); // this should throw
+            annotation.mapFrom(); // this should throw
         } catch (MirroredTypeException mte) {
             return mte.getTypeMirror();
+        } catch (Exception ignore) {
         }
 
         return null; // can this ever happen ??
@@ -636,5 +788,44 @@ public final class AutoMappperProcessor extends AbstractProcessor {
 
     private boolean hasSuperClass(TypeElement element) {
         return !element.getSuperclass().toString().equals(Object.class.getCanonicalName());
+    }
+
+    private void completeElementTargetName(TypeElement baseElement, List<TypeElement> elements, Map<TypeElement, String> targetNames) {
+        if (elements.size() == 0) {
+            return;
+        }
+        if (baseElement == null) {
+            mErrorReporter.abortWithError("You need to specify at least one element in mapTo, elements = " + elements.size(), null);
+
+            return;
+        }
+        for (TypeElement elm : elements) {
+            if (!targetNames.containsKey(elm)) {
+                targetNames.put(elm, getMappingTargetFullClassName(baseElement, elm));
+            }
+        }
+    }
+
+    private String getMappingTargetFullClassName(TypeElement base, TypeElement mapFrom) {
+        AutoMapper mapperAnnotation = base.getAnnotation(AutoMapper.class);
+        AutoMapper mapFromAnnotation = mapFrom.getAnnotation(AutoMapper.class);
+        TypeElement mapperGetFrom = getClassToMapFrom(base);
+        boolean isBaseMapperForTarget
+            = mapperGetFrom != null && mapperGetFrom.asType().toString().equals(mapFrom.asType().toString());
+
+        if (isBaseMapperForTarget && mapperAnnotation.mapTo().length() > 0) {
+            return mapperAnnotation.mapTo().contains(".")
+                ? mapperAnnotation.mapTo()
+                : TypeUtil.packageNameOf(base) + "." + mapperAnnotation.mapTo();
+        } else if (mapFromAnnotation != null && mapFromAnnotation.mapTo().length() > 0) {
+            return mapFromAnnotation.mapTo().contains(".")
+                ? mapFromAnnotation.mapTo()
+                : TypeUtil.packageNameOf(base) + "." + mapFromAnnotation.mapTo();
+        }
+        if (mapperAnnotation == null) {
+            System.out.println("Null annotation for " + base.toString());
+        }
+
+        return ClassName.get(base).packageName() + "." + mapperAnnotation.prefix() + ClassName.get(mapFrom).simpleName();
     }
 }

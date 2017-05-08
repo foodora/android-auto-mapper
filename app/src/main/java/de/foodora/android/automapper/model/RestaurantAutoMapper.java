@@ -16,14 +16,27 @@ package de.foodora.android.automapper.model;
  * limitations under the License.
  */
 
+import de.foodora.android.automapper.model.location.gps.ApiGps;
 import de.foodora.automapper.AutoMapper;
 
-@AutoMapper(map = ApiRestaurant.class, targetName = "Restaurant", parcelable = true)
-public abstract class RestaurantAutoMapper {
+public class RestaurantAutoMapper {
 
-    public String frontSign;
+    @AutoMapper(mapFrom = ApiRestaurant.class, mapTo = "Restaurant")
+    public static abstract class RestaurantAutoMapperClass {
+        public String frontSign;
 
-    void map(Restaurant restaurant) {
-        restaurant.frontSign = restaurant.name + "| " + restaurant.slogan;
+        void map(Restaurant restaurant) {
+            restaurant.frontSign = restaurant.name + "| " + restaurant.slogan;
+        }
     }
+
+    @AutoMapper(mapFrom = ApiAddress.class, mapTo = "Address", extendMapper = false)
+    public static abstract class AddressAutoMapper { }
+
+    @AutoMapper(mapFrom = ApiGps.class, mapTo = "Gps", extendMapper = false)
+    public static abstract class GpsAutoMapper { }
+
+    @AutoMapper(mapFrom = ApiRestaurantSet.class, mapTo = "RestaurantSet", extendMapper = false)
+    public static abstract class RestaurantSetAutoMapper { }
+
 }
