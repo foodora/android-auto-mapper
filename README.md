@@ -43,8 +43,8 @@ dependencies {
 
     //... other dependencies here
 
-    provided 'com.github.foodora.android-auto-mapper:library:1.0.5'
-    apt 'com.github.foodora.android-auto-mapper:compiler:1.0.5'
+    provided 'com.github.foodora.android-auto-mapper:library:1.1.0'
+    apt 'com.github.foodora.android-auto-mapper:compiler:1.1.0'
 }
 ```
 
@@ -59,7 +59,7 @@ it will do the rest.
 ```java
 import de.foodora.automapper.AutoMapper;
 
-@AutoMapper(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix", targetName = "OrSimplyFinalClassName", parcelable = true)
+@AutoMapper(map = ClassToMapFrom.class, prefix = "YourOptionalClassNamePrefix", mapTo = "OrSimplyFinalClassName", parcelable = true, extendMapper = false)
 public abstract class MappingPerson implements Parcelable { }
 ```
 
@@ -117,7 +117,7 @@ Now you can use your adapter into your classes.
 ```java
 import de.foodora.automapper.AutoParcel;
 
-@AutoMapper(targetName = "Person")
+@AutoMapper(mapTo = "Person")
 public abstract class MappedPerson {
     @Nullable
     public String name;
@@ -135,7 +135,7 @@ Parcel adapters are optional and the require the `ParcelTypeAdapter` runtime com
 To use them just add to your gradle the following dependency.
 
 ```
-compile 'com.github.foodora.android-auto-mapper:adapter:1.0.5'
+compile 'com.github.foodora.android-auto-mapper:adapter:1.1.0'
 ```
 
 ## Version-able Parcels
